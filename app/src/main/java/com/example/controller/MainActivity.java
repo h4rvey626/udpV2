@@ -39,11 +39,11 @@ public class MainActivity extends AppCompatActivity {
     // 左摇杆十字按钮
     private Button btnUp, btnDown, btnLeft, btnRight;
 
-    // 摇杆输入归一化 (-1~1)
-    private float lastThrottleNorm = 0f;
-    private float lastYawNorm = 0f;
-    private float lastPitchNorm = 0f;
-    private float lastRollNorm = 0f;
+    // 摇杆输入归一化 (-1~1) - 添加 volatile 保证线程安全
+    private volatile float lastThrottleNorm = 0f;
+    private volatile float lastYawNorm = 0f;
+    private volatile float lastPitchNorm = 0f;
+    private volatile float lastRollNorm = 0f;
 
     // 当前模式（来自遥测）
     private boolean isArmed = false;
@@ -57,12 +57,12 @@ public class MainActivity extends AppCompatActivity {
     // ===== 网络部分 ====
     private NetworkClient networkClient;
     private Handler sendHandler = new Handler();
-    
-    // ⭐ 优化：提高到 25Hz（提高控制响应速度）
-    private final int SEND_INTERVAL = 40; // 25Hz
 
-    private final float MAX_H_SPEED = 3.0f;
-    private final float MAX_CLIMB = 2.0f;
+    // ⭐ 优化：提高到 20Hz（提高控制响应速度）
+    private final int SEND_INTERVAL = 50; // 20Hz
+
+    private final float MAX_H_SPEED = 1.0f;
+    private final float MAX_CLIMB = 1.0f;
     private final float MAX_YAW_RATE = (float)Math.toRadians(45);
 
     // ======= 遥测数据缓存 =======
@@ -78,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
     
     // ⭐ UI更新节流
     private long lastUiUpdateTime = 0;
-    private static final int UI_UPDATE_INTERVAL = 50; // 20Hz UI更新
+    private static final int UI_UPDATE_INTERVAL = 100; // 10Hz UI更新
 
     // ⭐ 优化：摇杆几何参数缓存
     private float joystickCenterX = 0f;

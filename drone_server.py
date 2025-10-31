@@ -59,11 +59,14 @@ last_joystick_time = 0.0
 takeoff_in_progress = False
 takeoff_target_alt = None
 
+# Landing 过程标志
+landing_in_progress = False
+
 # 保存最近 STATUSTEXT
 recent_statustext = collections.deque(maxlen=50)
 
 # 速度控制频率 / 超时
-CONTROL_HZ = 10.0
+CONTROL_HZ = 20.0
 VELOCITY_TIMEOUT = 0.5  # s
 
 # Telemetry 发送间隔
@@ -144,6 +147,7 @@ def get_basic_status():
         st['battery'] = None
     st['takeoff_in_progress'] = takeoff_in_progress
     st['takeoff_target_alt'] = takeoff_target_alt
+    st['landing_in_progress'] = landing_in_progress
     
     # 添加控制状态指示
     control_status = {
@@ -163,6 +167,9 @@ def get_basic_status():
             elif mode_name == "LOITER":
                 control_status["can_control"] = False
                 control_status["message"] = "当前在 LOITER 模式，请切换到 GUIDED 模式以启用摇杆控制"
+            elif mode_name == "LAND":
+                control_status["can_control"] = False
+                control_status["message"] = "当前在 LAND 模式，降落过程中摇杆不可用"
             else:
                 control_status["can_control"] = False
                 control_status["message"] = "当前模式不支持摇杆控制"
@@ -447,7 +454,11 @@ class ControlWS(tornado.websocket.WebSocketHandler):
 
         # LAND
         if typ == "land":
+            global landing_in_progress
             ok = ensure_mode("LAND")
+            if ok:
+                landing_in_progress = True
+                log("[LAND] 开始降落过程")
             self.write_message(json.dumps({"type":"ack","cmd":"land","ok":ok}))
             return
 
@@ -538,8 +549,8 @@ def control_loop():
     while True:
         try:
             if vehicle and vehicle.armed:
-                # 起飞过程中完全停止速度控制，避免与 simple_takeoff 冲突
-                if takeoff_in_progress:
+                # 起飞或降落过程中完全停止速度控制，避免冲突
+                if takeoff_in_progress or landing_in_progress:
                     time.sleep(0.1)
                     continue
                     
@@ -548,7 +559,7 @@ def control_loop():
                     mode_name = vehicle.mode.name
                 except:
                     pass
-                if mode_name in ("GUIDED","GUIDED_NOGPS","BRAKE","LOITER","POSHOLD"):
+                if mode_name in ("GUIDED","GUIDED_NOGPS","BRAKE","POSHOLD"):
                     age = time.time() - last_joystick_time
                     cmd = last_velocity_cmd
                     if age > VELOCITY_TIMEOUT:
@@ -556,6 +567,13 @@ def control_loop():
                         send_ned_velocity(0.0, 0.0, 0.0, 0.0)
                     else:
                         send_ned_velocity(cmd["vx"], cmd["vy"], cmd["vz"], cmd["yaw_rate"])
+                elif mode_name == "LAND":
+                    # 降落过程中检测是否已降落完成
+                    if safe_alt() <= 0.2:  # 高度小于0.2米认为降落完成
+                        global landing_in_progress
+                        if landing_in_progress:
+                            landing_in_progress = False
+                            log("[LAND] 降落完成，重置降落标志")
             else:
                 # 未解锁时也稍作等待，减少CPU占用
                 time.sleep(0.1)
