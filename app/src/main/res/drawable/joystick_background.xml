@@ -1,0 +1,16 @@
+<!-- res/drawable/joystick_background.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <!-- 外圈描边：蓝色，3dp 宽 -->
+    <stroke
+        android:width="4dp"
+        android:color="#0088FF" />
+    <!-- 内部填充：深色半透明 -->
+    <solid android:color="#111133" />
+    <!-- 圆角内边距 -->
+    <padding
+        android:left="6dp"
+        android:top="6dp"
+        android:right="6dp"
+        android:bottom="6dp" />
+</shape>
