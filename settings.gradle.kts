@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "controllerV2"
+rootProject.name = "controllerV3"
 include(":app")
  

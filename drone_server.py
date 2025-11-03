@@ -332,10 +332,8 @@ def do_takeoff(target_alt):
         return
 
     # 进入 GUIDED
-    if not ensure_mode("GUIDED"):
-        # 如果你要允许室内:
-        # print("[TAKEOFF] GUIDED 失败，尝试 GUIDED_NOGPS")
-        # ensure_mode("GUIDED_NOGPS")
+    if not ensure_mode("GUIDED", "GUIDED_NOGPS"):
+
         print("[TAKEOFF] 无法进入 GUIDED，放弃")
         return
 
@@ -545,7 +543,7 @@ class StatusHandler(tornado.web.RequestHandler):
 
 # ========== 循环线程: 发送速度 / 推送遥测 ==========
 def control_loop():
-    global last_velocity_cmd
+    global last_velocity_cmd, landing_in_progress
     while True:
         try:
             if vehicle and vehicle.armed:
@@ -570,7 +568,6 @@ def control_loop():
                 elif mode_name == "LAND":
                     # 降落过程中检测是否已降落完成
                     if safe_alt() <= 0.2:  # 高度小于0.2米认为降落完成
-                        global landing_in_progress
                         if landing_in_progress:
                             landing_in_progress = False
                             log("[LAND] 降落完成，重置降落标志")

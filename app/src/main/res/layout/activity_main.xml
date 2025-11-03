@@ -82,7 +82,7 @@
             android:id="@+id/textPosition"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="位置: X:0.0m Y:0.0m"
+            android:text="电池电压: -"
             android:textColor="#FFFFFF"
             android:textSize="14sp" />
 

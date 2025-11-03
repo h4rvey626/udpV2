@@ -2,6 +2,7 @@ package com.example.controller;
 
 import static android.widget.Toast.LENGTH_SHORT;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
@@ -61,8 +62,8 @@ public class MainActivity extends AppCompatActivity {
     // ⭐ 优化：提高到 20Hz（提高控制响应速度）
     private final int SEND_INTERVAL = 50; // 20Hz
 
-    private final float MAX_H_SPEED = 1.0f;
-    private final float MAX_CLIMB = 1.0f;
+    private final float MAX_H_SPEED = 0.5f;
+    private final float MAX_CLIMB = 0.5f;
     private final float MAX_YAW_RATE = (float)Math.toRadians(45);
 
     // ======= 遥测数据缓存 =======
@@ -75,6 +76,9 @@ public class MainActivity extends AppCompatActivity {
     private Double lastTelemRoll = null;
     private Double lastTelemPitch = null;
     private Double lastTelemYaw = null;
+    
+    // 电池电压数据缓存
+    private Double lastTelemVoltage = null;
     
     // ⭐ UI更新节流
     private long lastUiUpdateTime = 0;
@@ -218,13 +222,7 @@ public class MainActivity extends AppCompatActivity {
             else showConnectDialog();
         });
 
-        btnArm.setOnClickListener(v -> {
-            if (isArmed) {
-                sendArmDisarm(false);
-            } else {
-                sendArmDisarm(true);
-            }
-        });
+        btnArm.setOnClickListener(v -> sendArmDisarm(!isArmed));
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main),(view,insets)->{
             Insets sys = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -256,6 +254,12 @@ public class MainActivity extends AppCompatActivity {
                 lastTelemPitch = attitude.has("pitch") && !attitude.isNull("pitch") ? attitude.optDouble("pitch") : null;
                 lastTelemYaw = attitude.has("yaw") && !attitude.isNull("yaw") ? attitude.optDouble("yaw") : null;
             }
+            
+            // 提取电池电压信息
+            if (o.has("battery") && !o.isNull("battery")) {
+                JSONObject battery = o.getJSONObject("battery");
+                lastTelemVoltage = battery.has("voltage") && !battery.isNull("voltage") ? battery.optDouble("voltage") : null;
+            }
 
             // 提取控制状态信息
             if (o.has("control_status") && !o.isNull("control_status")) {
@@ -282,6 +286,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint({"SetTextI18n", "DefaultLocale"})
     private void updateUiFromTelemetry() {
         textAltitude.setText(String.format("高度: %.2f m", lastTelemAltitude));
         
@@ -308,12 +313,19 @@ public class MainActivity extends AppCompatActivity {
             textAttitude.setText("姿态: -");
         }
         
-        textPosition.setText("");
+        // 更新电池电压信息
+        if (lastTelemVoltage != null) {
+            textPosition.setText(String.format("电池电压: %.2fV", lastTelemVoltage));
+        } else {
+            textPosition.setText("电池电压: -");
+        }
+        
         textMode.setText("模式: " + lastTelemMode);
         updateArmButtonText();
     }
 
     // 控制状态更新
+    @SuppressLint("SetTextI18n")
     private void updateControlStatus(boolean canControl, String currentMode, String message) {
         runOnUiThread(() -> {
             // 如果不能控制且消息不为空，显示提醒
@@ -333,6 +345,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ===== 连接管理 =====
+    @SuppressLint("SetTextI18n")
     private void showConnectDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("连接到无人机服务器");
@@ -499,6 +512,12 @@ public class MainActivity extends AppCompatActivity {
         if (arm) {
             networkClient.sendCommand("arm");
             Toast.makeText(this,"🔓 发送 ARM", LENGTH_SHORT).show();
+
+            // 延迟1.5秒 确保切换到GUIDED模式以启用摇杆控制
+            new Handler().postDelayed(() -> {
+                networkClient.sendMode("GUIDED");
+                Toast.makeText(this,"✅ 切换到 GUIDED 模式，摇杆控制已启用", LENGTH_SHORT).show();
+            }, 1500);
         } else {
             networkClient.sendCommand("disarm");
             Toast.makeText(this,"🔒 发送 DISARM", LENGTH_SHORT).show();

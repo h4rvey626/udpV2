@@ -308,7 +308,6 @@ public class CameraStreamView extends SurfaceView implements SurfaceHolder.Callb
                     
                 } catch (java.net.SocketTimeoutException e) {
                     // 超时是正常的，用于检查 isStreaming 标志
-                    continue;
                 } catch (Exception e) {
                     consecutiveErrors++;
                     if (consecutiveErrors > 10) {
@@ -341,13 +340,10 @@ public class CameraStreamView extends SurfaceView implements SurfaceHolder.Callb
         }
         
         // ========== 解析 RTP Header (RFC 3550) ==========
-        
-        int version = (data[0] >> 6) & 0x03;
+
         boolean padding = (data[0] & 0x20) != 0;
         boolean hasExtension = (data[0] & 0x10) != 0;
         int csrcCount = data[0] & 0x0F;
-        boolean marker = (data[1] & 0x80) != 0;
-        int payloadType = data[1] & 0x7F;
         int sequence = ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
         
         // 检测丢包
@@ -532,7 +528,11 @@ public class CameraStreamView extends SurfaceView implements SurfaceHolder.Callb
         if (!naluQueue.offer(nalu)) {
             // 队列满，移除最旧的帧
             naluQueue.poll();
-            naluQueue.offer(nalu);
+            if (!naluQueue.offer(nalu)) {
+                // 如果仍然失败，记录警告
+                Log.w(TAG, "队列仍然满，丢弃当前帧");
+                return;
+            }
             Log.d(TAG, "队列满，丢弃旧帧");
         }
     }
